@@ -467,7 +467,7 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 Clone the repository:
 
 ```bash
-git clone https://github.com/your-username/selfmade-ckks.git
+git clone https://github.com/liangchatwork/SelfMade-CKKS.git
 ```
 
 Enter the project directory:
@@ -530,8 +530,6 @@ Dec(Enc(A) + Enc(B)) \approx A + B
 $$
 
 ---
-
-可以，Reference 這段改成這樣比較像論文格式：
 
 ## 6. Reference
 
