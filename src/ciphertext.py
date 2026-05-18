@@ -1,156 +1,116 @@
 # ============================================================
 # selfmade-ckks
 #
-# File: ciphertext.py
+# Ciphertext Representation
 #
-# Description:
-# This module implements the Ciphertext abstraction used in
-# CKKS-style homomorphic encryption.
-#
-# In RLWE-based homomorphic encryption schemes such as CKKS,
-# ciphertexts are not single values.
-#
-# A fresh ciphertext usually has two polynomial components:
+# In CKKS, a fresh ciphertext usually contains two polynomial
+# components:
 #
 #     ct = (c0, c1)
 #
-# During decryption:
+# Decryption uses:
 #
-#     message ≈ c0 + c1 * s
+#     c0 + c1 * s
 #
-# After ciphertext-ciphertext multiplication, the ciphertext
-# size grows:
+# After ciphertext-ciphertext multiplication, ciphertext size
+# grows:
 #
 #     (c0, c1) * (d0, d1)
-#       =
-#     (c0*d0, c0*d1 + c1*d0, c1*d1)
+#       = (c0*d0, c0*d1 + c1*d0, c1*d1)
 #
-# Therefore, the ciphertext becomes:
+# The multiplied ciphertext has three components:
 #
 #     ct = (c0, c1, c2)
 #
-# During decryption:
+# Decryption then uses:
 #
-#     message ≈ c0 + c1*s + c2*s^2
+#     c0 + c1*s + c2*s^2
 #
-# This growth is why CKKS needs relinearization later.
+# Relinearization later reduces size 3 back to size 2.
 #
-# Reference:
-# OpenMined CKKS Explained Part 4
-# https://openmined.org/blog/ckks-explained-part-4-multiplication-and-relinearization/
+# This class also stores educational metadata:
 #
+#     scale   - CKKS scale metadata
+#     length  - original vector length
+#     depth   - multiplication depth
+#     history - operation history for educational tracking
+#
+# Note:
+# This is not a formal cryptographic noise estimator yet.
 # ============================================================
 
 
 class Ciphertext:
     """
-    Ciphertext Class
+    Ciphertext object used by Selfmade-CKKS.
 
-    Represents encrypted polynomial data.
+    Supports both:
 
-    Current supported structures:
         Fresh ciphertext:
-            (c0, c1)
+            components = [c0, c1]
 
-        After multiplication:
-            (c0, c1, c2)
+        Multiplied ciphertext:
+            components = [c0, c1, c2]
 
-    Additional metadata:
-        scale:
-            CKKS scaling factor.
-
-        length:
-            Original vector length before encryption.
+    The metadata fields help track CKKS behavior during
+    homomorphic operations.
     """
 
-    def __init__(self, c0=None, c1=None, scale=1.0, length=None, components=None):
-        """
-        Initialize ciphertext.
-
-        Parameters
-        ----------
-        c0 : Polynomial
-            First ciphertext polynomial.
-
-        c1 : Polynomial
-            Second ciphertext polynomial.
-
-        scale : float
-            CKKS scaling factor.
-
-        length : int, optional
-            Original vector length before encoding/encryption.
-
-        components : list, optional
-            General ciphertext component list.
-
-        Why components?
-
-        Fresh ciphertexts have 2 components:
-
-            [c0, c1]
-
-        But multiplication creates 3 components:
-
-            [c0, c1, c2]
-
-        Later, relinearization will reduce this back to 2.
-        """
-
+    def __init__(
+        self,
+        c0=None,
+        c1=None,
+        components=None,
+        scale=1.0,
+        length=None,
+        depth=0,
+        history=None,
+    ):
         if components is not None:
             self.components = components
         else:
+            if c0 is None or c1 is None:
+                raise ValueError(
+                    "Ciphertext requires either components or both c0 and c1."
+                )
             self.components = [c0, c1]
+
+        if len(self.components) < 2:
+            raise ValueError("Ciphertext must contain at least two components.")
+
+        # Backward-compatible access.
+        self.c0 = self.components[0]
+        self.c1 = self.components[1]
 
         self.scale = scale
         self.length = length
 
-        # Keep backward-compatible access.
-        self.c0 = self.components[0]
-        self.c1 = self.components[1] if len(self.components) > 1 else None
-
-    # ========================================================
-    # Ciphertext Size
-    # ========================================================
+        # Educational noise / operation tracking metadata.
+        self.depth = depth
+        self.history = history if history is not None else []
 
     def size(self):
         """
-        Return number of ciphertext components.
-
-        Fresh ciphertext:
-            size = 2
-
-        After multiplication:
-            size = 3
+        Return the number of ciphertext components.
         """
-
         return len(self.components)
 
-    # ========================================================
-    # String Representation
-    # ========================================================
+    def add_history(self, operation):
+        """
+        Return a copied history list with a new operation appended.
+        """
+        return self.history + [operation]
 
     def __repr__(self):
-        """
-        Developer-friendly representation.
-        """
-
         return (
             f"Ciphertext("
-            f"components={self.components}, "
+            f"size={self.size()}, "
             f"scale={self.scale}, "
-            f"length={self.length}"
+            f"length={self.length}, "
+            f"depth={self.depth}, "
+            f"history={self.history}"
             f")"
         )
 
     def __str__(self):
-        """
-        Human-readable representation.
-        """
-
-        return (
-            f"Ciphertext("
-            f"size={self.size()}, "
-            f"scale={self.scale}"
-            f")"
-        )
+        return self.__repr__()

@@ -128,6 +128,8 @@ class CKKSScheme:
             c1=c1,
             scale=plaintext.scale,
             length=plaintext.length,
+            depth=0,
+            history=["encrypt"],
         )
 
     # ========================================================
@@ -259,6 +261,8 @@ class CKKSScheme:
             c1=new_c1,
             scale=left.scale,
             length=left.length,
+            depth=max(left.depth, right.depth),
+            history=left.history + right.history + ["add_ciphertexts"],
         )
     
     # ========================================================
@@ -348,6 +352,8 @@ class CKKSScheme:
             components=[r0, r1, r2],
             scale=left.scale * right.scale,
             length=left.length,
+            depth=max(left.depth, right.depth) + 1,
+            history=left.history + right.history + ["multiply_ciphertexts"],
         )
     
     # ========================================================
@@ -493,6 +499,8 @@ class CKKSScheme:
             components=[new_c0, new_c1],
             scale=ciphertext.scale,
             length=ciphertext.length,
+            depth=ciphertext.depth,
+            history=ciphertext.add_history("relinearize"),
         )
     
     # ========================================================
@@ -562,60 +570,10 @@ class CKKSScheme:
             c1=ciphertext.c1,
             scale=ciphertext.scale,
             length=ciphertext.length,
-        )
-    
-    # ========================================================
-    # Ciphertext-Scalar Addition
-    # ========================================================
-
-    def add_scalar_to_ciphertext(self, ciphertext, scalar):
-        """
-        Add a scalar constant to a ciphertext.
-
-        Mathematical idea:
-
-            ct = (c0, c1)
-
-        To add a scalar value k:
-
-            ct + k = (c0 + k * Δ, c1)
-
-        Why multiply by scale Δ?
-
-        The encrypted message is already encoded as:
-
-            m * Δ
-
-        Therefore, a raw scalar k must also be converted into
-        the same encoded scale before being added.
-
-        After decryption and decoding:
-
-            Dec(ct + k) ≈ m + k
-
-        This operation does not change ciphertext size and does
-        not change the scale.
-        """
-
-        if not isinstance(ciphertext, Ciphertext):
-            raise TypeError("ciphertext must be a Ciphertext object.")
-
-        encoded_scalar = scalar * ciphertext.scale
-
-        # Add scalar only to the constant term of c0.
-        scalar_poly = self.ring.create_constant(encoded_scalar)
-
-        new_c0 = self.ring.add(
-            ciphertext.c0,
-            scalar_poly,
+            depth=ciphertext.depth,
+            history=ciphertext.add_history("add_plaintext"),
         )
 
-        return Ciphertext(
-            c0=new_c0,
-            c1=ciphertext.c1,
-            scale=ciphertext.scale,
-            length=ciphertext.length,
-        )
 
     # ========================================================
     # Ciphertext-Scalar Multiplication
@@ -670,4 +628,78 @@ class CKKSScheme:
             c1=new_c1,
             scale=ciphertext.scale,
             length=ciphertext.length,
+            depth=ciphertext.depth,
+            history=ciphertext.add_history("multiply_scalar"),
+        )
+    
+    # ========================================================
+    # Ciphertext-Plaintext Multiplication
+    # ========================================================
+
+    def multiply_plaintext_with_ciphertext(self, ciphertext, plaintext):
+        """
+        Multiply a ciphertext by an encoded plaintext.
+
+        Mathematical idea:
+
+            ct = (c0, c1)
+            pt = p
+
+        Then:
+
+            ct * pt = (c0 * p, c1 * p)
+
+        Decryption:
+
+            (c0 * p) + (c1 * p) * s
+              = p * (c0 + c1*s)
+              ≈ p * m
+
+        Scale behavior:
+
+            ciphertext.scale = Δ
+            plaintext.scale  = Δ
+
+            result.scale = Δ²
+
+        This is different from scalar multiplication.
+
+        Scalar multiplication:
+
+            Enc(m) * k
+
+        keeps the same scale.
+
+        Plaintext multiplication:
+
+            Enc(m) * Encode(p)
+
+        grows the scale.
+        """
+
+        if not isinstance(ciphertext, Ciphertext):
+            raise TypeError("ciphertext must be a Ciphertext object.")
+
+        if not isinstance(plaintext, Plaintext):
+            raise TypeError("plaintext must be a Plaintext object.")
+
+        if ciphertext.length != plaintext.length:
+            raise ValueError("Ciphertext and plaintext must have the same length.")
+
+        new_components = [
+            self.ring.multiply(component, plaintext.polynomial)
+            for component in ciphertext.components
+        ]
+
+        if ciphertext.scale != plaintext.scale:
+            raise ValueError(
+                "Ciphertext and plaintext must have the same scale before multiplication."
+            )
+
+        return Ciphertext(
+            components=new_components,
+            scale=ciphertext.scale * plaintext.scale,
+            length=ciphertext.length,
+            depth=ciphertext.depth + 1,
+            history=ciphertext.add_history("multiply_plaintext"),
         )

@@ -4,7 +4,7 @@
 
 Selfmade-CKKS is a Python implementation of the CKKS Homomorphic Encryption scheme, built to make encrypted real-number computation understandable, modular, and extensible.
 
-This project focuses on implementing the core ideas behind CKKS from the ground up, including polynomial ring arithmetic, RLWE-based encryption, noise-based security, approximate decoding, homomorphic computation, ciphertext multiplication, and relinearization.
+This project focuses on implementing the core ideas behind CKKS from the ground up, including polynomial ring arithmetic, RLWE-based encryption, noise-based security, approximate decoding, homomorphic computation, ciphertext multiplication, scale growth, and relinearization.
 
 Rather than simply calling an existing HE library, the goal is to gradually build a readable and educational open-source CKKS framework while preserving the real mathematical structure behind the scheme.
 
@@ -18,6 +18,7 @@ The project combines:
 * Encrypted Vector Computation
 * Ciphertext Multiplication
 * Relinearization
+* Educational Noise / Operation Tracking
 * Python Open Source Engineering
 
 ---
@@ -30,20 +31,20 @@ Homomorphic Encryption, or HE, is a type of encryption that allows computation t
 
 In traditional encryption, data must be decrypted before computation:
 
-plaintext
-→ encrypt
-→ ciphertext
-→ decrypt
-→ plaintext
+plaintext  
+→ encrypt  
+→ ciphertext  
+→ decrypt  
+→ plaintext  
 → compute
 
 In Homomorphic Encryption, computation happens while the data remains encrypted:
 
-plaintext
-→ encrypt
-→ ciphertext
-→ compute on ciphertext
-→ decrypt
+plaintext  
+→ encrypt  
+→ ciphertext  
+→ compute on ciphertext  
+→ decrypt  
 → computed plaintext
 
 The key idea is that operations on ciphertexts correspond to operations on plaintexts.
@@ -249,6 +250,17 @@ $$
 
 This is why CKKS decrypts to approximate values.
 
+This project also tracks educational operation metadata such as multiplication depth and operation history. This is useful for understanding how ciphertexts evolve during homomorphic operations.
+
+Current tracking includes:
+
+* Ciphertext size
+* Scale metadata
+* Multiplication depth
+* Operation history
+
+However, this is not yet a formal CKKS noise bound estimator.
+
 ---
 
 ### Plaintext-Ciphertext Operations
@@ -285,13 +297,13 @@ Plaintext values must still be encoded into polynomial form before interacting w
 
 Ciphertext-plaintext addition is currently supported in this project.
 
-Ciphertext-plaintext multiplication is planned together with multiplication and rescaling improvements, because multiplication introduces scale growth:
+Ciphertext-plaintext multiplication is also currently supported. Since both the ciphertext and plaintext carry scale, multiplication causes scale growth:
 
 $$
 \Delta \cdot \Delta = \Delta^2
 $$
 
-This requires future rescaling support to make the result easier to manage.
+This means rescaling will be needed in later phases to reduce the scale back to a manageable level.
 
 ---
 
@@ -339,7 +351,7 @@ $$
 2 \rightarrow 3
 $$
 
-In this project, ciphertext-ciphertext multiplication has been implemented, and the current multiplication demo shows ciphertext size growth and scale growth.
+In this project, ciphertext-ciphertext multiplication has been implemented, and the multiplication demo shows ciphertext size growth, scale growth, and multiplication depth tracking.
 
 ---
 
@@ -384,6 +396,8 @@ $$
 $$
 
 The decrypted result should remain approximately the same, while the ciphertext structure becomes compact again.
+
+Relinearization does not reduce the scale. Scale reduction is handled by rescaling, which is planned for a later phase.
 
 ---
 
@@ -453,7 +467,7 @@ $$
 2^{20} \cdot 2^{20} = 2^{40}
 $$
 
-This project currently tracks scale metadata correctly after multiplication.
+This project currently tracks scale metadata correctly after ciphertext-plaintext and ciphertext-ciphertext multiplication.
 
 Rescaling is not implemented yet.
 
@@ -481,15 +495,15 @@ $$
 
 This allows the project to first build a complete working pipeline:
 
-vector
-→ encode
-→ plaintext
-→ encrypt
-→ ciphertext
-→ homomorphic addition
-→ multiplication
-→ relinearization
-→ decrypt
+vector  
+→ encode  
+→ plaintext  
+→ encrypt  
+→ ciphertext  
+→ homomorphic addition  
+→ multiplication  
+→ relinearization  
+→ decrypt  
 → decode
 
 Future versions will replace this simplified encoder with a more complete CKKS encoding implementation.
@@ -500,13 +514,13 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 
 ### Core Implementation
 
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge\&logo=python\&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 
 ### Future Development
 
-![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge\&logo=numpy\&logoColor=white)
-![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=for-the-badge\&logo=pytest\&logoColor=white)
-![Jupyter](https://img.shields.io/badge/Jupyter-F37626?style=for-the-badge\&logo=jupyter\&logoColor=white)
+![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
+![Jupyter](https://img.shields.io/badge/Jupyter-F37626?style=for-the-badge&logo=jupyter&logoColor=white)
 
 ### Cryptographic Focus
 
@@ -516,6 +530,8 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 * Gaussian-style Noise Sampling
 * Ciphertext Multiplication
 * Relinearization
+* Scale Tracking
+* Educational Noise / Operation Tracking
 
 ---
 
@@ -590,13 +606,13 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 
 ### Phase 7 — Multiplication and Scale Growth ✅
 
+* [x] Ciphertext-plaintext multiplication
 * [x] Ciphertext multiplication
 * [x] Ciphertext size growth
 * [x] Scale growth tracking
 * [x] Decryption for 3-component ciphertexts
 * [x] Multiplication demo
-* [ ] Ciphertext-plaintext multiplication
-* [ ] Noise growth tracking
+* [x] Educational noise / operation tracking
 
 ---
 
@@ -606,7 +622,6 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 * [x] Gadget/base decomposition
 * [x] Convert ciphertext size from 3 back to 2
 * [x] Relinearization demo
-* [ ] Advanced key switching improvements
 
 ---
 
@@ -616,6 +631,7 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 * [ ] Modulus switching
 * [ ] Level management
 * [ ] Restore scale after multiplication
+* [ ] Improve multiplication chain support
 
 ---
 
@@ -626,6 +642,8 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 * [ ] SIMD-style packing
 * [ ] More examples
 * [ ] Unit tests
+* [ ] Advanced key switching improvements
+* [ ] Formal noise estimation
 
 ---
 
@@ -637,7 +655,7 @@ Clone the repository:
 
 ```bash
 git clone https://github.com/liangchatwork/SelfMade-CKKS.git
-```
+````
 
 Enter the project directory:
 
@@ -657,9 +675,21 @@ Example output:
 
 ```bash
 Original:   [1.1, 2.2, 3.3]
-Plaintext:  Plaintext(1153433.6 + 2306867.2x + 3460300.8x^2)
-Decoded:    [1.1, 2.2, 3.3]
+Plaintext:  Plaintext(1153434 + 2306867x + 3460301x^2)
+Decoded:    [1.1000003814697266, 2.1999998092651367, 3.3000001907348633]
 ```
+
+This demonstrates:
+
+$$
+Encode(x) = round(x \cdot \Delta)
+$$
+
+and:
+
+$$
+Decode(Encode(x)) \approx x
+$$
 
 ---
 
@@ -675,6 +705,12 @@ Example output:
 Original:   [1.1, 2.2, 3.3]
 Decrypted:  [1.1000009, 2.2000038, 3.2999990]
 ```
+
+This demonstrates approximate CKKS-style decryption:
+
+$$
+Dec(Enc(x)) \approx x
+$$
 
 ---
 
@@ -694,12 +730,6 @@ Expected:   [5, 7, 9]
 Decrypted:  [4.999992, 7.000005, 8.999994]
 ```
 
-This demonstrates:
-
-$$
-Dec(Enc(A) + Enc(B)) \approx A + B
-$$
-
 Current supported basic operations:
 
 $$
@@ -718,6 +748,16 @@ $$
 Enc(a) \cdot k
 $$
 
+Scalar addition is implemented by encoding:
+
+$$
+[k, k, k, ...]
+$$
+
+with the same ciphertext vector length.
+
+Scalar multiplication directly multiplies ciphertext polynomial components and keeps the same scale.
+
 ---
 
 ### Multiplication and Relinearization
@@ -729,35 +769,59 @@ python examples/04_multiplication_relinearization.py
 Example output:
 
 ```bash
+Ciphertext * Plaintext
+Encrypted Input:       [2]
+Plaintext Input:       [3]
+Expected:              [6]
+Ciphertext Size:       2
+Scale:                 1099511627776
+Depth:                 1
+History:               ['encrypt', 'multiply_plaintext']
+Decrypted:             [5.99994277954102]
+
 Ciphertext * Ciphertext
-Input A:              [2]
-Input B:              [3]
-Expected:             [6]
+Input A:               [2]
+Input B:               [3]
+Expected:              [6]
 
 Before Relinearization
-Ciphertext Size:      3
-Scale:                1099511627776
-Decrypted:            [6.00009536707694]
+Ciphertext Size:       3
+Scale:                 1099511627776
+Depth:                 1
+History:               ['encrypt', 'encrypt', 'multiply_ciphertexts']
+Decrypted:             [5.999904632486505]
 
 After Relinearization
-Ciphertext Size:      2
-Scale:                1099511627776
-Decrypted:            [6.00009552741176]
+Ciphertext Size:       2
+Scale:                 1099511627776
+Depth:                 1
+History:               ['encrypt', 'encrypt', 'multiply_ciphertexts', 'relinearize']
+Decrypted:             [5.999990478757354]
 ```
 
-This demonstrates:
+This demonstrates ciphertext-plaintext multiplication:
 
 $$
-Enc(a) \cdot Enc(b) \approx Enc(a \cdot b)
+Dec(Enc(a) \cdot Encode(p)) \approx a \cdot p
 $$
 
-and shows:
+ciphertext-ciphertext multiplication:
 
 $$
-2 \rightarrow 3 \rightarrow 2
+Dec(Enc(a) \cdot Enc(b)) \approx a \cdot b
 $$
 
-for ciphertext size.
+ciphertext size growth:
+
+$$
+2 \rightarrow 3
+$$
+
+and relinearization:
+
+$$
+3 \rightarrow 2
+$$
 
 The scale remains:
 
@@ -766,6 +830,8 @@ $$
 $$
 
 because rescaling has not been implemented yet.
+
+Depth and history are currently educational metadata for understanding operation flow. They are not formal CKKS noise bounds.
 
 ---
 
@@ -797,3 +863,4 @@ because rescaling has not been implemented yet.
 
 * Pyfhel.
   [https://github.com/ibarrond/Pyfhel](https://github.com/ibarrond/Pyfhel)
+

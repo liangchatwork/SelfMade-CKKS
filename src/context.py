@@ -253,7 +253,8 @@ class CKKSContext:
 
             2 -> 3
 
-        Later, relinearization and rescaling will be needed.
+        Relinearization can reduce ciphertext size from 3 back to 2.
+        Rescaling is still future work.
         """
 
         return self.scheme.multiply_ciphertexts(left, right)
@@ -286,10 +287,6 @@ class CKKSContext:
             plaintext,
         )
     
-    # ========================================================
-    # Ciphertext-Scalar Addition
-    # ========================================================
-
     # ========================================================
     # Ciphertext-Scalar Addition
     # ========================================================
@@ -359,6 +356,33 @@ class CKKSContext:
         return self.scheme.multiply_ciphertext_by_scalar(
             ciphertext,
             scalar,
+        )
+    
+    # ========================================================
+    # Ciphertext-Plaintext Multiplication
+    # ========================================================
+    
+    def multiply_plain(self, ciphertext, plain_vector):
+        """
+        Multiply a ciphertext by an encoded plaintext vector.
+
+        Example:
+
+            Enc([1, 2, 3]) * Encode([10, 20, 30])
+
+        This grows the scale:
+
+            Δ * Δ = Δ²
+
+        Unlike scalar multiplication, plaintext multiplication
+        changes the ciphertext scale.
+        """
+
+        plaintext = self.encode(plain_vector)
+
+        return self.scheme.multiply_plaintext_with_ciphertext(
+            ciphertext,
+            plaintext,
         )
     
     # ========================================================

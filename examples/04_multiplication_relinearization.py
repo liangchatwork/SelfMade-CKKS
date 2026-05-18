@@ -1,40 +1,30 @@
 # ============================================================
 # selfmade-ckks
 #
-# Example: Ciphertext Multiplication
+# Example: Multiplication, Scale Growth, and Relinearization
 #
-# This demo shows the first CKKS multiplication-related step:
+# This demo shows:
 #
-#   Ciphertext * Ciphertext
-#
-# In CKKS, multiplying two ciphertexts causes two important
-# effects:
-#
-#   1. Ciphertext size grows
-#        (c0, c1) -> (c0, c1, c2)
-#
-#   2. Scale grows
-#        Δ -> Δ²
-#
-# This is why CKKS later needs:
-#
-#   - Relinearization
-#   - Rescaling
+#   1. Ciphertext-Plaintext Multiplication
+#   2. Ciphertext-Ciphertext Multiplication
+#   3. Ciphertext Size Growth
+#   4. Scale Growth
+#   5. Relinearization
+#   6. Educational operation / noise tracking
 #
 # Current status:
 #
-#   - Ciphertext multiplication is implemented
-#   - Relinearization is NOT implemented yet
+#   - Ciphertext-plaintext multiplication is implemented
+#   - Ciphertext-ciphertext multiplication is implemented
+#   - Relinearization is implemented
 #   - Rescaling is NOT implemented yet
 #
-# Therefore, this example focuses on observing ciphertext size
-# growth and scale growth.
+# Therefore, multiplication results keep scale Δ².
 # ============================================================
 
 import sys
 from pathlib import Path
 
-# Allow example file to import from src/
 ROOT_DIR = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT_DIR / "src"
 sys.path.append(str(SRC_DIR))
@@ -51,23 +41,38 @@ def main():
     )
 
     # ========================================================
-    # Ciphertext * Ciphertext
-    # ========================================================
-    #
-    # We use single-value inputs here.
-    #
-    # Reason:
-    # The current encoder is still a simplified coefficient
-    # mapping encoder, not full CKKS SIMD slot encoding.
-    #
-    # Vector multiplication will require full CKKS encoding
-    # or a clearer polynomial-slot interpretation.
+    # Ciphertext-Plaintext Multiplication
     # ========================================================
 
     a = [2]
-    b = [3]
+    p = [3]
 
     enc_a = ctx.encrypt(a)
+
+    enc_plain_product = ctx.multiply_plain(
+        enc_a,
+        p,
+    )
+
+    plain_product_result = ctx.decrypt(enc_plain_product)
+
+    print("Ciphertext * Plaintext")
+    print("Encrypted Input:      ", a)
+    print("Plaintext Input:      ", p)
+    print("Expected:             ", [6])
+    print("Ciphertext Size:      ", enc_plain_product.size())
+    print("Scale:                ", enc_plain_product.scale)
+    print("Depth:                ", enc_plain_product.depth)
+    print("History:              ", enc_plain_product.history)
+    print("Decrypted:            ", plain_product_result)
+    print()
+
+    # ========================================================
+    # Ciphertext-Ciphertext Multiplication
+    # ========================================================
+
+    b = [3]
+
     enc_b = ctx.encrypt(b)
 
     enc_product = ctx.multiply(
@@ -90,12 +95,16 @@ def main():
     print("Before Relinearization")
     print("Ciphertext Size:      ", enc_product.size())
     print("Scale:                ", enc_product.scale)
+    print("Depth:                ", enc_product.depth)
+    print("History:              ", enc_product.history)
     print("Decrypted:            ", result_before_relin)
     print()
 
     print("After Relinearization")
     print("Ciphertext Size:      ", relin_product.size())
     print("Scale:                ", relin_product.scale)
+    print("Depth:                ", relin_product.depth)
+    print("History:              ", relin_product.history)
     print("Decrypted:            ", result_after_relin)
     print()
 
@@ -105,7 +114,10 @@ def main():
     print("After relinearization, size is 2:  (c0, c1)")
     print("Current scale was Δ = 2^20")
     print("After multiplication: Δ² = 2^40")
+    print("Depth tracks multiplication depth.")
+    print("History tracks educational operation flow.")
     print("Rescaling is not implemented yet.")
+
 
 if __name__ == "__main__":
     main()
