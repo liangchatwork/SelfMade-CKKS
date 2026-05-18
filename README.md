@@ -548,41 +548,44 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 
 ---
 
-### Phase 2 — Polynomial Ring Arithmetic ✅
+### Phase 2 — Polynomial Ring Arithmetic 🚧
 
 * [x] Polynomial ring abstraction
 * [x] Negacyclic reduction
 * [x] Ring addition
 * [x] Ring subtraction
 * [x] Ring multiplication
+* [ ] Coefficient modulus q reduction
+* [ ] Centered coefficient representation
 
 ---
 
 ### Phase 3 — Encoding / Decoding 🚧
 
-* [x] Simplified encoder
+* [x] Simplified coefficient-based encoder
 * [x] Scaling support
 * [x] Decode pipeline
 * [x] Vector length metadata
+* [x] Integer rounding after scaling
 * [ ] Canonical embedding
-* [ ] Inverse embedding
-* [ ] Coordinate projection
+* [ ] Inverse canonical embedding
 * [ ] Random rounding
 * [ ] Full CKKS encoding
 
 ---
 
-### Phase 4 — RLWE Key Generation ✅
+### Phase 4 — RLWE Key Generation 🚧
 
 * [x] Secret key generation
 * [x] Public key generation
 * [x] Uniform polynomial sampling
 * [x] Gaussian-style error sampling
 * [x] Relinearization key generation
+* [ ] Randomized encryption support using u, e0, e1
 
 ---
 
-### Phase 5 — Encryption / Decryption ✅
+### Phase 5 — Encryption / Decryption 🚧
 
 * [x] Plaintext abstraction
 * [x] Ciphertext abstraction
@@ -590,6 +593,9 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 * [x] Decryption
 * [x] Approximate recovery
 * [x] Scale metadata support
+* [x] Ciphertext depth tracking
+* [x] Operation history tracking
+* [ ] Decryption correctness under modulus q
 
 ---
 
@@ -599,8 +605,8 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 * [x] Ciphertext-plaintext addition
 * [x] Ciphertext-scalar addition
 * [x] Ciphertext-scalar multiplication
+* [x] Scalar broadcasting through plaintext encoding
 * [x] Encrypted vector addition demo
-* [x] Approximate decrypted result
 
 ---
 
@@ -616,33 +622,34 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 
 ---
 
-### Phase 8 — Relinearization ✅
+### Phase 8 — Relinearization 🚧
 
 * [x] Relinearization key
 * [x] Gadget/base decomposition
 * [x] Convert ciphertext size from 3 back to 2
 * [x] Relinearization demo
+* [ ] Relinearization correctness tests
 
 ---
 
-### Phase 9 — Rescaling 🚧
+### Phase 9 — Rescaling and Modulus Switching 🚧
 
 * [ ] Rescaling operation
 * [ ] Modulus switching
 * [ ] Level management
-* [ ] Restore scale after multiplication
-* [ ] Improve multiplication chain support
+* [ ] Multiplication chain support
 
 ---
 
-### Phase 10 — Vector and API Improvements
+### Phase 10 — Testing and API Improvements 🚧
 
+* [ ] Unit tests with Pytest
+* [ ] Numerical tolerance tests
+* [ ] Random vector tests
 * [ ] NumPy support
+* [ ] Optional Pandas-based result reporting
 * [ ] Cleaner high-level API
-* [ ] SIMD-style packing
 * [ ] More examples
-* [ ] Unit tests
-* [ ] Advanced key switching improvements
 * [ ] Formal noise estimation
 
 ---
