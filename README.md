@@ -1,6 +1,6 @@
 # Selfmade-CKKS
 
-## 1. Introduction
+## Introduction
 
 Selfmade-CKKS is a Python implementation of the CKKS Homomorphic Encryption scheme, built to make encrypted real-number computation understandable, modular, and extensible.
 
@@ -20,7 +20,7 @@ The project combines:
 
 ---
 
-## 2. Background
+## Background
 
 ### What is Homomorphic Encryption?
 
@@ -249,6 +249,50 @@ This is why CKKS decrypts to approximate values.
 
 ---
 
+### Plaintext-Ciphertext Operations
+
+In CKKS, plaintext values can also interact directly with ciphertexts.
+
+This means operations such as:
+
+$$
+Enc(m) + Encode(p)
+$$
+
+and:
+
+$$
+Enc(m) \cdot Encode(p)
+$$
+
+are also supported.
+
+After decryption:
+
+$$
+Dec(Enc(m) + Encode(p)) \approx m + p
+$$
+
+and:
+
+$$
+Dec(Enc(m) \cdot Encode(p)) \approx m \cdot p
+$$
+
+Plaintext values must still be encoded into polynomial form before interacting with ciphertexts.
+
+Ciphertext-plaintext addition is already supported in this project.
+
+Ciphertext-plaintext multiplication is planned together with ciphertext multiplication, because multiplication introduces scale growth:
+
+$$
+\Delta \cdot \Delta = \Delta^2
+$$
+
+This requires future rescaling support to make the result usable.
+
+---
+
 ### Scaling
 
 CKKS uses a scale factor to preserve decimal precision.
@@ -340,7 +384,7 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 
 ---
 
-## 3. Tech Stack
+## Tech Stack
 
 ### Core Implementation
 
@@ -359,10 +403,9 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 * CKKS Approximate Arithmetic
 * Gaussian-style Noise Sampling
 
-
 ---
 
-## 4. Roadmap
+## Roadmap
 
 ### Phase 1 — Polynomial Arithmetic ✅
 
@@ -418,18 +461,21 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 
 ---
 
-### Phase 6 — Homomorphic Addition ✅
+### Phase 6 — Basic Homomorphic Operations ✅
 
 * [x] Ciphertext addition
+* [x] Ciphertext-plaintext addition
 * [x] Encrypted vector addition demo
 * [x] Approximate decrypted result
 
 ---
 
-### Phase 7 — Ciphertext Multiplication
+### Phase 7 — Multiplication and Scale Growth 🚧
 
+* [ ] Ciphertext-plaintext multiplication
 * [ ] Ciphertext multiplication
 * [ ] Ciphertext size growth
+* [ ] Scale growth handling
 * [ ] Noise growth tracking
 
 ---
@@ -444,9 +490,10 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 
 ### Phase 9 — Rescaling
 
-* [ ] Scale growth handling
+* [ ] Rescaling operation
 * [ ] Modulus switching
 * [ ] Level management
+* [ ] Restore scale after multiplication
 
 ---
 
@@ -460,7 +507,7 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 
 ---
 
-## 5. Usage
+## Usage
 
 ### Installation
 
@@ -529,9 +576,21 @@ $$
 Dec(Enc(A) + Enc(B)) \approx A + B
 $$
 
+Current supported operations:
+
+$$
+Enc(a) + Enc(b)
+$$
+
+$$
+Enc(a) + Encode(p)
+$$
+
+Ciphertext-plaintext multiplication and ciphertext-ciphertext multiplication are currently planned for Phase 7 due to CKKS scale growth and future rescaling requirements.
+
 ---
 
-## 6. Reference
+## Reference
 
 ### Papers
 

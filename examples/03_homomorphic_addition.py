@@ -1,26 +1,25 @@
 # ============================================================
 # selfmade-ckks
 #
-# Example: Homomorphic Addition
+# Example: Homomorphic Operations
 #
-# This demo shows the first complete HE-style pipeline:
+# This demo shows three basic CKKS-style homomorphic operations:
 #
-#     vector
-#       -> encode
-#       -> encrypt
-#       -> homomorphic add
-#       -> decrypt
-#       -> decode
+#   1. Ciphertext + Ciphertext
+#   2. Ciphertext + Plaintext
 #
-# Expected result:
+# In CKKS, plaintext values must also be encoded before they
+# can interact with ciphertexts.
 #
-#     [1, 2, 3] + [4, 5, 6]
-#       =
-#     [5, 7, 9]
+# Current supported operations:
+#
+#   Enc(a) + Enc(b)      ≈ a + b
+#   Enc(a) + Encode(p)  ≈ a + p
 #
 # Note:
-# This is currently an educational CKKS-style prototype.
-# The encoder and encryption are not production-secure yet.
+# This is currently an educational CKKS implementation.
+# Full CKKS encoding, rescaling, and relinearization are still
+# planned future work.
 # ============================================================
 
 import sys
@@ -42,6 +41,10 @@ def main():
         noise_std=3.2,
     )
 
+    # ========================================================
+    # 1. Ciphertext + Ciphertext
+    # ========================================================
+
     a = [1, 2, 3]
     b = [4, 5, 6]
 
@@ -50,11 +53,34 @@ def main():
 
     enc_sum = ctx.add(enc_a, enc_b)
 
-    result = ctx.decrypt(enc_sum)
+    sum_result = ctx.decrypt(enc_sum)
 
+    print("Ciphertext + Ciphertext")
     print("Input A:   ", a)
     print("Input B:   ", b)
-    print("Decrypted: ", result)
+    print("Expected:  ", [5, 7, 9])
+    print("Decrypted: ", sum_result)
+    print()
+
+    # ========================================================
+    # 2. Ciphertext + Plaintext
+    # ========================================================
+
+    plain_add = [10, 20, 30]
+
+    enc_add_plain = ctx.add_plain(
+        enc_a,
+        plain_add,
+    )
+
+    add_plain_result = ctx.decrypt(enc_add_plain)
+
+    print("Ciphertext + Plaintext")
+    print("Encrypted: ", a)
+    print("Plaintext: ", plain_add)
+    print("Expected:  ", [11, 22, 33])
+    print("Decrypted: ", add_plain_result)
+    print()
 
 
 if __name__ == "__main__":

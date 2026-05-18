@@ -224,3 +224,32 @@ class CKKSContext:
         """
 
         return self.scheme.add_ciphertexts(left, right)
+    
+    # ========================================================
+    # Ciphertext-Plaintext Addition
+    # ========================================================
+
+    def add_plain(self, ciphertext, plain_vector):
+        """
+        Add a plaintext vector to a ciphertext.
+
+        User-facing API:
+
+            enc = ctx.encrypt([1, 2, 3])
+            out = ctx.add_plain(enc, [10, 20, 30])
+
+        Internally:
+
+            plain_vector
+                -> encode
+                -> Plaintext
+                -> scheme.add_plaintext_to_ciphertext()
+        """
+
+        plaintext = self.encode(plain_vector)
+
+        return self.scheme.add_plaintext_to_ciphertext(
+            ciphertext,
+            plaintext,
+        )
+    

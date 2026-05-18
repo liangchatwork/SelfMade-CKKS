@@ -217,3 +217,73 @@ class CKKSScheme:
             scale=left.scale,
             length=left.length,
         )
+    
+    # ========================================================
+    # Ciphertext-Plaintext Addition
+    # ========================================================
+
+    def add_plaintext_to_ciphertext(self, ciphertext, plaintext):
+        """
+        Add a plaintext to a ciphertext.
+
+        Mathematical idea:
+
+            ct = (c0, c1)
+
+        If plaintext is encoded as polynomial p, then:
+
+            ct + p = (c0 + p, c1)
+
+        Why only c0 changes?
+
+        During decryption:
+
+            (c0 + p) + c1 * s
+                =
+            (c0 + c1 * s) + p
+
+        Since:
+
+            c0 + c1 * s ≈ m
+
+        the result becomes:
+
+            m + p
+
+        Therefore:
+
+            Dec(Enc(m) + Encode(p)) ≈ m + p
+
+        This operation is cheaper than ciphertext-ciphertext
+        addition because plaintext does not contain a second
+        ciphertext component.
+        """
+
+        if not isinstance(ciphertext, Ciphertext):
+            raise TypeError("ciphertext must be a Ciphertext object.")
+
+        if not isinstance(plaintext, Plaintext):
+            raise TypeError("plaintext must be a Plaintext object.")
+
+        if ciphertext.scale != plaintext.scale:
+            raise ValueError(
+                "Ciphertext and plaintext must have the same scale."
+            )
+
+        if ciphertext.length != plaintext.length:
+            raise ValueError(
+                "Ciphertext and plaintext must have the same vector length."
+            )
+
+        new_c0 = self.ring.add(
+            ciphertext.c0,
+            plaintext.polynomial,
+        )
+
+        return Ciphertext(
+            c0=new_c0,
+            c1=ciphertext.c1,
+            scale=ciphertext.scale,
+            length=ciphertext.length,
+        )
+    
