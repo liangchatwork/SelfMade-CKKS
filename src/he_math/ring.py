@@ -173,3 +173,23 @@ class PolynomialRing:
         result = a * b
 
         return self.reduce(result)
+    
+    # ========================================================
+    # Constant Polynomial
+    # ========================================================
+
+    def create_constant(self, value):
+        """
+        Create a constant polynomial inside the ring.
+
+        Example:
+            value = 5
+
+        becomes:
+            5 + 0x + 0x² + ...
+
+        In coefficient-list form:
+            [5]
+        """
+
+        return Polynomial([value])

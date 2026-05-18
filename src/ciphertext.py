@@ -8,23 +8,36 @@
 # CKKS-style homomorphic encryption.
 #
 # In RLWE-based homomorphic encryption schemes such as CKKS,
-# ciphertexts are NOT single values.
+# ciphertexts are not single values.
 #
-# Instead, they are typically tuples of polynomials:
+# A fresh ciphertext usually has two polynomial components:
 #
-#     (c0, c1)
+#     ct = (c0, c1)
 #
 # During decryption:
 #
 #     message ≈ c0 + c1 * s
 #
-# where:
+# After ciphertext-ciphertext multiplication, the ciphertext
+# size grows:
 #
-#     s = secret key
+#     (c0, c1) * (d0, d1)
+#       =
+#     (c0*d0, c0*d1 + c1*d0, c1*d1)
+#
+# Therefore, the ciphertext becomes:
+#
+#     ct = (c0, c1, c2)
+#
+# During decryption:
+#
+#     message ≈ c0 + c1*s + c2*s^2
+#
+# This growth is why CKKS needs relinearization later.
 #
 # Reference:
-# OpenMined CKKS Explained Part 3
-# https://openmined.org/blog/ckks-explained-part-3-encryption-and-decryption/
+# OpenMined CKKS Explained Part 4
+# https://openmined.org/blog/ckks-explained-part-4-multiplication-and-relinearization/
 #
 # ============================================================
 
@@ -35,8 +48,12 @@ class Ciphertext:
 
     Represents encrypted polynomial data.
 
-    Current simplified structure:
-        (c0, c1)
+    Current supported structures:
+        Fresh ciphertext:
+            (c0, c1)
+
+        After multiplication:
+            (c0, c1, c2)
 
     Additional metadata:
         scale:
@@ -44,14 +61,9 @@ class Ciphertext:
 
         length:
             Original vector length before encryption.
-
-    Why length matters:
-        The polynomial ring has fixed degree N.
-        If the original input vector length is smaller than N,
-        we should only decode the original number of slots.
     """
 
-    def __init__(self, c0, c1, scale=1.0, length=None):
+    def __init__(self, c0=None, c1=None, scale=1.0, length=None, components=None):
         """
         Initialize ciphertext.
 
@@ -68,12 +80,51 @@ class Ciphertext:
 
         length : int, optional
             Original vector length before encoding/encryption.
+
+        components : list, optional
+            General ciphertext component list.
+
+        Why components?
+
+        Fresh ciphertexts have 2 components:
+
+            [c0, c1]
+
+        But multiplication creates 3 components:
+
+            [c0, c1, c2]
+
+        Later, relinearization will reduce this back to 2.
         """
 
-        self.c0 = c0
-        self.c1 = c1
+        if components is not None:
+            self.components = components
+        else:
+            self.components = [c0, c1]
+
         self.scale = scale
         self.length = length
+
+        # Keep backward-compatible access.
+        self.c0 = self.components[0]
+        self.c1 = self.components[1] if len(self.components) > 1 else None
+
+    # ========================================================
+    # Ciphertext Size
+    # ========================================================
+
+    def size(self):
+        """
+        Return number of ciphertext components.
+
+        Fresh ciphertext:
+            size = 2
+
+        After multiplication:
+            size = 3
+        """
+
+        return len(self.components)
 
     # ========================================================
     # String Representation
@@ -86,8 +137,7 @@ class Ciphertext:
 
         return (
             f"Ciphertext("
-            f"c0={self.c0}, "
-            f"c1={self.c1}, "
+            f"components={self.components}, "
             f"scale={self.scale}, "
             f"length={self.length}"
             f")"
@@ -100,7 +150,7 @@ class Ciphertext:
 
         return (
             f"Ciphertext("
-            f"c0={self.c0}, "
-            f"c1={self.c1}"
+            f"size={self.size()}, "
+            f"scale={self.scale}"
             f")"
         )

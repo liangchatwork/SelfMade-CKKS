@@ -56,6 +56,8 @@ class CKKSContext:
         modulus=2**40,
         scale=2**20,
         noise_std=3.2,
+        decomposition_base=2**10,
+        decomposition_levels=12,
     ):
         """
         Initialize CKKS context.
@@ -123,10 +125,13 @@ class CKKSContext:
             degree=degree,
             modulus=modulus,
             noise_std=noise_std,
+            decomposition_base=decomposition_base,
+            decomposition_levels=decomposition_levels,
         )
 
         self.secret_key = keygen.generate_secret_key()
         self.public_key = keygen.generate_public_key(self.secret_key)
+        self.relinearization_key = keygen.generate_relinearization_key(self.secret_key)
 
         # ----------------------------------------------------
         # Main encryption scheme.
@@ -136,6 +141,7 @@ class CKKSContext:
             ring=self.ring,
             public_key=self.public_key,
             secret_key=self.secret_key,
+            relinearization_key=self.relinearization_key,
         )
 
     # ========================================================
@@ -162,19 +168,10 @@ class CKKSContext:
         )
 
     def decode(self, plaintext):
-        """
-        Decode a Plaintext object back into a vector.
-
-        Pipeline:
-
-            Plaintext
-                -> encoder.decode()
-                -> approximate vector
-        """
-
         return self.encoder.decode(
             plaintext.polynomial,
             length=plaintext.length,
+            scale=plaintext.scale,
         )
 
     # ========================================================
@@ -226,6 +223,42 @@ class CKKSContext:
         return self.scheme.add_ciphertexts(left, right)
     
     # ========================================================
+    # Ciphertext-Ciphertext Multiplication
+    # ========================================================
+
+    def multiply(self, left, right):
+        """
+        Multiply two ciphertexts homomorphically.
+
+        User-facing API:
+
+            enc_a = ctx.encrypt([2])
+            enc_b = ctx.encrypt([3])
+
+            enc_product = ctx.multiply(enc_a, enc_b)
+
+            result = ctx.decrypt(enc_product)
+
+        Expected result:
+
+            [6]
+
+        Important:
+
+        This operation increases scale:
+
+            Δ -> Δ²
+
+        and ciphertext size:
+
+            2 -> 3
+
+        Later, relinearization and rescaling will be needed.
+        """
+
+        return self.scheme.multiply_ciphertexts(left, right)
+    
+    # ========================================================
     # Ciphertext-Plaintext Addition
     # ========================================================
 
@@ -253,3 +286,101 @@ class CKKSContext:
             plaintext,
         )
     
+    # ========================================================
+    # Ciphertext-Scalar Addition
+    # ========================================================
+
+    # ========================================================
+    # Ciphertext-Scalar Addition
+    # ========================================================
+
+    def add_scalar(self, ciphertext, scalar):
+        """
+        Add a scalar value to every encrypted slot.
+
+        User-facing API:
+
+            enc = ctx.encrypt([1, 2, 3])
+            out = ctx.add_scalar(enc, 10)
+
+        Expected decrypted result:
+
+            [11, 12, 13]
+
+        Important:
+
+        In our current simplified encoder:
+
+            vector[i] * scale -> polynomial coefficient[i]
+
+        Therefore, adding a scalar to every slot means we must
+        encode:
+
+            [scalar, scalar, scalar, ...]
+
+        with the same length as the ciphertext.
+        """
+
+        if ciphertext.length is None:
+            raise ValueError(
+                "Ciphertext length is required for scalar addition."
+            )
+
+        plain_vector = [
+            scalar
+            for _ in range(ciphertext.length)
+        ]
+
+        plaintext = self.encode(plain_vector)
+
+        return self.scheme.add_plaintext_to_ciphertext(
+            ciphertext,
+            plaintext,
+        )
+
+    # ========================================================
+    # Ciphertext-Scalar Multiplication
+    # ========================================================
+
+    def multiply_scalar(self, ciphertext, scalar):
+        """
+        Multiply every encrypted value by a scalar.
+
+        User-facing API:
+
+            enc = ctx.encrypt([1, 2, 3])
+            out = ctx.multiply_scalar(enc, 2)
+
+        Expected decrypted result:
+
+            [2, 4, 6]
+        """
+
+        return self.scheme.multiply_ciphertext_by_scalar(
+            ciphertext,
+            scalar,
+        )
+    
+    # ========================================================
+    # Relinearization
+    # ========================================================
+
+    def relinearize(self, ciphertext):
+        """
+        Relinearize a multiplied ciphertext.
+
+        User-facing API:
+
+            enc_product = ctx.multiply(enc_a, enc_b)
+            enc_product = ctx.relinearize(enc_product)
+
+        This reduces ciphertext size:
+
+            3 -> 2
+
+        but keeps the same scale.
+
+        Rescaling is a separate future step.
+        """
+
+        return self.scheme.relinearize_ciphertext(ciphertext)

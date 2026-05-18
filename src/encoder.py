@@ -109,7 +109,7 @@ class CKKSEncoder:
         """
 
         scaled_vector = [
-            value * self.scale
+            int(round(value * self.scale))
             for value in vector
         ]
 
@@ -119,28 +119,30 @@ class CKKSEncoder:
     # Decoding
     # ========================================================
 
-    def decode(self, poly, length=None):
+    def decode(self, poly, length=None, scale=None):
         """
         Decode polynomial back into vector.
 
-        Current decoding strategy:
-            coefficient[i] / scale -> vector[i]
+        Important:
+            We should divide by the scale carried by the plaintext,
+            not always by the encoder's default scale.
 
-        Parameters
-        ----------
-        poly : Polynomial
-            Polynomial to decode.
+        Why?
 
-        length : int, optional
-            Original vector length.
+            Fresh ciphertext:
+                scale = Δ
 
-        Why length matters:
-            The ring degree may be larger than the original vector.
-            We only return the original number of encoded values.
+            After multiplication:
+                scale = Δ²
+
+            If we still divide by Δ after multiplication, the result
+            will be too large by a factor of Δ.
         """
 
+        decode_scale = scale if scale is not None else self.scale
+
         decoded_vector = [
-            coeff / self.scale
+            coeff / decode_scale
             for coeff in poly.coefficients
         ]
 

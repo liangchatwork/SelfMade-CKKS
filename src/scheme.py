@@ -60,7 +60,13 @@ class CKKSScheme:
     - add_ciphertexts()
     """
 
-    def __init__(self, ring, public_key, secret_key):
+    def __init__(
+        self,
+        ring,
+        public_key,
+        secret_key,
+        relinearization_key=None,
+    ):
         """
         Initialize scheme.
 
@@ -79,6 +85,7 @@ class CKKSScheme:
         self.ring = ring
         self.public_key = public_key
         self.secret_key = secret_key
+        self.relinearization_key = relinearization_key
 
     # ========================================================
     # Encryption
@@ -131,32 +138,68 @@ class CKKSScheme:
         """
         Decrypt a Ciphertext object into a Plaintext object.
 
-        Decryption formula:
+        Fresh ciphertext decryption:
 
-            recovered = c0 + c1 * s
+            m' = c0 + c1*s
 
-        Substitute encryption:
+        After multiplication, ciphertext may have 3 components:
 
-            c0 = m + (-a*s + e)
-            c1 = a
+            m' = c0 + c1*s + c2*s^2
 
-        Then:
+        General form:
 
-            recovered = m + (-a*s + e) + a*s
-                      = m + e
+            m' = sum(ci * s^i)
 
-        In CKKS, approximate recovery is expected.
+        This is mathematically important because ciphertext
+        multiplication increases ciphertext size.
+
+        Relinearization will later reduce:
+
+            (c0, c1, c2)
+
+        back into:
+
+            (c0, c1)
         """
 
         if not isinstance(ciphertext, Ciphertext):
             raise TypeError("decrypt_ciphertext expects a Ciphertext object.")
 
-        c0 = ciphertext.c0
-        c1 = ciphertext.c1
         s = self.secret_key.polynomial
 
-        c1_times_s = self.ring.multiply(c1, s)
-        recovered = self.ring.add(c0, c1_times_s)
+        # Start with c0.
+        recovered = ciphertext.components[0]
+
+        # Current power of secret key.
+        #
+        # For i = 1:
+        #     s_power = s
+        #
+        # For i = 2:
+        #     s_power = s^2
+        #
+        s_power = s
+
+        for i in range(1, len(ciphertext.components)):
+            term = self.ring.multiply(
+                ciphertext.components[i],
+                s_power,
+            )
+
+            recovered = self.ring.add(
+                recovered,
+                term,
+            )
+
+            # Prepare next power:
+            #
+            #     s_power = s_power * s
+            #
+            if i < len(ciphertext.components) - 1:
+                s_power = self.ring.multiply(
+                    s_power,
+                    s,
+                )
 
         return Plaintext(
             polynomial=recovered,
@@ -216,6 +259,240 @@ class CKKSScheme:
             c1=new_c1,
             scale=left.scale,
             length=left.length,
+        )
+    
+    # ========================================================
+    # Ciphertext-Ciphertext Multiplication
+    # ========================================================
+
+    def multiply_ciphertexts(self, left, right):
+        """
+        Multiply two ciphertexts homomorphically.
+
+        Mathematical idea:
+
+            left  = (c0, c1)
+            right = (d0, d1)
+
+        Then:
+
+            left * right
+                =
+            (c0*d0,
+             c0*d1 + c1*d0,
+             c1*d1)
+
+        This creates a 3-component ciphertext:
+
+            (r0, r1, r2)
+
+        Decryption becomes:
+
+            r0 + r1*s + r2*s^2
+
+        Important CKKS consequence:
+
+        1. Ciphertext size grows:
+               2 -> 3
+
+        2. Scale grows:
+               Δ -> Δ²
+
+        3. Noise grows.
+
+        Later phases will implement:
+
+        - relinearization:
+              reduce size 3 back to size 2
+
+        - rescaling:
+              reduce scale Δ² back to manageable scale
+        """
+
+        if not isinstance(left, Ciphertext):
+            raise TypeError("left must be a Ciphertext object.")
+
+        if not isinstance(right, Ciphertext):
+            raise TypeError("right must be a Ciphertext object.")
+
+        if left.scale != right.scale:
+            raise ValueError(
+                "Ciphertexts must have the same scale before multiplication."
+            )
+
+        if left.length != right.length:
+            raise ValueError(
+                "Ciphertexts must have the same vector length before multiplication."
+            )
+
+        if left.size() != 2 or right.size() != 2:
+            raise ValueError(
+                "Current multiplication only supports fresh 2-component ciphertexts."
+            )
+
+        c0, c1 = left.components
+        d0, d1 = right.components
+
+        # r0 = c0 * d0
+        r0 = self.ring.multiply(c0, d0)
+
+        # r1 = c0*d1 + c1*d0
+        c0_d1 = self.ring.multiply(c0, d1)
+        c1_d0 = self.ring.multiply(c1, d0)
+        r1 = self.ring.add(c0_d1, c1_d0)
+
+        # r2 = c1 * d1
+        r2 = self.ring.multiply(c1, d1)
+
+        return Ciphertext(
+            components=[r0, r1, r2],
+            scale=left.scale * right.scale,
+            length=left.length,
+        )
+    
+    # ========================================================
+    # Polynomial Decomposition
+    # ========================================================
+
+    def _decompose_polynomial(self, poly, base, levels):
+        """
+        Decompose a polynomial into base-B digit polynomials.
+
+        Example:
+
+            coeff = 1234
+            base = 10
+
+        becomes digits:
+
+            4, 3, 2, 1
+
+        For relinearization, we decompose c2:
+
+            c2 = d0 + d1*B + d2*B² + ...
+
+        Then each digit polynomial is used with the matching
+        relinearization key entry.
+        """
+
+        digit_coeffs = [
+            [0 for _ in range(len(poly.coefficients))]
+            for _ in range(levels)
+        ]
+
+        for coeff_index, coeff in enumerate(poly.coefficients):
+            sign = -1 if coeff < 0 else 1
+            value = abs(int(round(coeff)))
+
+            for level in range(levels):
+                digit = value % base
+                digit_coeffs[level][coeff_index] = sign * digit
+                value //= base
+
+            if value != 0:
+                raise ValueError(
+                    "Polynomial coefficient is too large for current "
+                    "decomposition levels. Increase decomposition_levels."
+                )
+
+        return [
+            type(poly)(coeffs)
+            for coeffs in digit_coeffs
+        ]
+    
+    # ========================================================
+    # Relinearization
+    # ========================================================
+
+    def relinearize_ciphertext(self, ciphertext):
+        """
+        Relinearize a 3-component ciphertext back to 2 components.
+
+        Input after multiplication:
+
+            ct = (r0, r1, r2)
+
+        Decryption would be:
+
+            r0 + r1*s + r2*s²
+
+        Relinearization replaces:
+
+            r2*s²
+
+        with:
+
+            u0 + u1*s
+
+        using the relinearization key.
+
+        Output:
+
+            ct' = (r0 + u0, r1 + u1)
+
+        Then decryption becomes:
+
+            (r0 + u0) + (r1 + u1)*s
+
+        which is approximately equivalent to:
+
+            r0 + r1*s + r2*s²
+        """
+
+        if self.relinearization_key is None:
+            raise ValueError("Relinearization key is not available.")
+
+        if not isinstance(ciphertext, Ciphertext):
+            raise TypeError("ciphertext must be a Ciphertext object.")
+
+        if ciphertext.size() != 3:
+            raise ValueError(
+                "Relinearization currently expects a 3-component ciphertext."
+            )
+
+        r0, r1, r2 = ciphertext.components
+
+        base = self.relinearization_key.base
+        levels = self.relinearization_key.levels
+
+        digit_polys = self._decompose_polynomial(
+            r2,
+            base=base,
+            levels=levels,
+        )
+
+        # These accumulate the replacement for r2*s²:
+        #
+        #     r2*s² ≈ u0 + u1*s
+        #
+        u0 = self.ring.create_constant(0)
+        u1 = self.ring.create_constant(0)
+
+        for level, digit_poly in enumerate(digit_polys):
+            relin_entry = self.relinearization_key.entries[level]
+
+            # digit * b_i
+            part0 = self.ring.multiply(
+                digit_poly,
+                relin_entry.b,
+            )
+
+            # digit * a_i
+            part1 = self.ring.multiply(
+                digit_poly,
+                relin_entry.a,
+            )
+
+            u0 = self.ring.add(u0, part0)
+            u1 = self.ring.add(u1, part1)
+
+        new_c0 = self.ring.add(r0, u0)
+        new_c1 = self.ring.add(r1, u1)
+
+        return Ciphertext(
+            components=[new_c0, new_c1],
+            scale=ciphertext.scale,
+            length=ciphertext.length,
         )
     
     # ========================================================
@@ -287,3 +564,110 @@ class CKKSScheme:
             length=ciphertext.length,
         )
     
+    # ========================================================
+    # Ciphertext-Scalar Addition
+    # ========================================================
+
+    def add_scalar_to_ciphertext(self, ciphertext, scalar):
+        """
+        Add a scalar constant to a ciphertext.
+
+        Mathematical idea:
+
+            ct = (c0, c1)
+
+        To add a scalar value k:
+
+            ct + k = (c0 + k * Δ, c1)
+
+        Why multiply by scale Δ?
+
+        The encrypted message is already encoded as:
+
+            m * Δ
+
+        Therefore, a raw scalar k must also be converted into
+        the same encoded scale before being added.
+
+        After decryption and decoding:
+
+            Dec(ct + k) ≈ m + k
+
+        This operation does not change ciphertext size and does
+        not change the scale.
+        """
+
+        if not isinstance(ciphertext, Ciphertext):
+            raise TypeError("ciphertext must be a Ciphertext object.")
+
+        encoded_scalar = scalar * ciphertext.scale
+
+        # Add scalar only to the constant term of c0.
+        scalar_poly = self.ring.create_constant(encoded_scalar)
+
+        new_c0 = self.ring.add(
+            ciphertext.c0,
+            scalar_poly,
+        )
+
+        return Ciphertext(
+            c0=new_c0,
+            c1=ciphertext.c1,
+            scale=ciphertext.scale,
+            length=ciphertext.length,
+        )
+
+    # ========================================================
+    # Ciphertext-Scalar Multiplication
+    # ========================================================
+
+    def multiply_ciphertext_by_scalar(self, ciphertext, scalar):
+        """
+        Multiply a ciphertext by a scalar constant.
+
+        Mathematical idea:
+
+            ct = (c0, c1)
+
+        To multiply by scalar k:
+
+            k * ct = (k*c0, k*c1)
+
+        During decryption:
+
+            k*c0 + k*c1*s
+                =
+            k * (c0 + c1*s)
+
+        Since:
+
+            c0 + c1*s ≈ m
+
+        the result becomes:
+
+            k*m
+
+        Important:
+
+        This operation keeps the same scale.
+
+        It is different from multiplying by an encoded plaintext
+        with scale Δ, which would cause:
+
+            Δ * Δ = Δ²
+
+        and require rescaling later.
+        """
+
+        if not isinstance(ciphertext, Ciphertext):
+            raise TypeError("ciphertext must be a Ciphertext object.")
+
+        new_c0 = scalar * ciphertext.c0
+        new_c1 = scalar * ciphertext.c1
+
+        return Ciphertext(
+            c0=new_c0,
+            c1=new_c1,
+            scale=ciphertext.scale,
+            length=ciphertext.length,
+        )

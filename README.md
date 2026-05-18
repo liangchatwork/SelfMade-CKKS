@@ -4,7 +4,7 @@
 
 Selfmade-CKKS is a Python implementation of the CKKS Homomorphic Encryption scheme, built to make encrypted real-number computation understandable, modular, and extensible.
 
-This project focuses on implementing the core ideas behind CKKS from the ground up, including polynomial ring arithmetic, RLWE-based encryption, noise-based security, approximate decoding, and homomorphic computation.
+This project focuses on implementing the core ideas behind CKKS from the ground up, including polynomial ring arithmetic, RLWE-based encryption, noise-based security, approximate decoding, homomorphic computation, ciphertext multiplication, and relinearization.
 
 Rather than simply calling an existing HE library, the goal is to gradually build a readable and educational open-source CKKS framework while preserving the real mathematical structure behind the scheme.
 
@@ -16,6 +16,8 @@ The project combines:
 * RLWE-based Cryptography
 * Gaussian Noise Sampling
 * Encrypted Vector Computation
+* Ciphertext Multiplication
+* Relinearization
 * Python Open Source Engineering
 
 ---
@@ -281,15 +283,107 @@ $$
 
 Plaintext values must still be encoded into polynomial form before interacting with ciphertexts.
 
-Ciphertext-plaintext addition is already supported in this project.
+Ciphertext-plaintext addition is currently supported in this project.
 
-Ciphertext-plaintext multiplication is planned together with ciphertext multiplication, because multiplication introduces scale growth:
+Ciphertext-plaintext multiplication is planned together with multiplication and rescaling improvements, because multiplication introduces scale growth:
 
 $$
 \Delta \cdot \Delta = \Delta^2
 $$
 
-This requires future rescaling support to make the result usable.
+This requires future rescaling support to make the result easier to manage.
+
+---
+
+### Ciphertext Multiplication
+
+Fresh CKKS ciphertexts usually contain two polynomial components:
+
+$$
+ct = (c_0, c_1)
+$$
+
+Decryption uses:
+
+$$
+m' = c_0 + c_1 \cdot s
+$$
+
+When two ciphertexts are multiplied:
+
+$$
+(c_0, c_1) \cdot (d_0, d_1)
+$$
+
+the result becomes:
+
+$$
+(c_0d_0,\ c_0d_1 + c_1d_0,\ c_1d_1)
+$$
+
+This creates a three-component ciphertext:
+
+$$
+ct_{mul} = (r_0, r_1, r_2)
+$$
+
+Decryption then becomes:
+
+$$
+m' = r_0 + r_1 \cdot s + r_2 \cdot s^2
+$$
+
+This is why multiplication increases ciphertext size:
+
+$$
+2 \rightarrow 3
+$$
+
+In this project, ciphertext-ciphertext multiplication has been implemented, and the current multiplication demo shows ciphertext size growth and scale growth.
+
+---
+
+### Relinearization
+
+After ciphertext multiplication, the ciphertext has three components:
+
+$$
+(r_0, r_1, r_2)
+$$
+
+The extra $r_2$ component introduces an $s^2$ term during decryption:
+
+$$
+r_0 + r_1s + r_2s^2
+$$
+
+Relinearization converts this back into a two-component ciphertext:
+
+$$
+(c_0', c_1')
+$$
+
+so that decryption returns to the standard form:
+
+$$
+c_0' + c_1's
+$$
+
+The goal is:
+
+$$
+c_0' + c_1's \approx r_0 + r_1s + r_2s^2
+$$
+
+This project currently implements an educational relinearization mechanism using gadget/base decomposition and relinearization keys.
+
+After relinearization:
+
+$$
+3 \rightarrow 2
+$$
+
+The decrypted result should remain approximately the same, while the ciphertext structure becomes compact again.
 
 ---
 
@@ -347,6 +441,22 @@ $$
 5.0
 $$
 
+After multiplication, the scale grows:
+
+$$
+\Delta \cdot \Delta = \Delta^2
+$$
+
+For example:
+
+$$
+2^{20} \cdot 2^{20} = 2^{40}
+$$
+
+This project currently tracks scale metadata correctly after multiplication.
+
+Rescaling is not implemented yet.
+
 ---
 
 ### Current Implementation Note
@@ -377,6 +487,8 @@ vector
 → encrypt
 → ciphertext
 → homomorphic addition
+→ multiplication
+→ relinearization
 → decrypt
 → decode
 
@@ -402,6 +514,8 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 * RLWE-based Encryption
 * CKKS Approximate Arithmetic
 * Gaussian-style Noise Sampling
+* Ciphertext Multiplication
+* Relinearization
 
 ---
 
@@ -448,6 +562,7 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 * [x] Public key generation
 * [x] Uniform polynomial sampling
 * [x] Gaussian-style error sampling
+* [x] Relinearization key generation
 
 ---
 
@@ -458,6 +573,7 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 * [x] Encryption
 * [x] Decryption
 * [x] Approximate recovery
+* [x] Scale metadata support
 
 ---
 
@@ -465,30 +581,36 @@ Future versions will replace this simplified encoder with a more complete CKKS e
 
 * [x] Ciphertext addition
 * [x] Ciphertext-plaintext addition
+* [x] Ciphertext-scalar addition
+* [x] Ciphertext-scalar multiplication
 * [x] Encrypted vector addition demo
 * [x] Approximate decrypted result
 
 ---
 
-### Phase 7 — Multiplication and Scale Growth 🚧
+### Phase 7 — Multiplication and Scale Growth ✅
 
+* [x] Ciphertext multiplication
+* [x] Ciphertext size growth
+* [x] Scale growth tracking
+* [x] Decryption for 3-component ciphertexts
+* [x] Multiplication demo
 * [ ] Ciphertext-plaintext multiplication
-* [ ] Ciphertext multiplication
-* [ ] Ciphertext size growth
-* [ ] Scale growth handling
 * [ ] Noise growth tracking
 
 ---
 
-### Phase 8 — Relinearization
+### Phase 8 — Relinearization ✅
 
-* [ ] Relinearization key
-* [ ] Key switching
-* [ ] Ciphertext size reduction
+* [x] Relinearization key
+* [x] Gadget/base decomposition
+* [x] Convert ciphertext size from 3 back to 2
+* [x] Relinearization demo
+* [ ] Advanced key switching improvements
 
 ---
 
-### Phase 9 — Rescaling
+### Phase 9 — Rescaling 🚧
 
 * [ ] Rescaling operation
 * [ ] Modulus switching
@@ -556,7 +678,7 @@ Decrypted:  [1.1000009, 2.2000038, 3.2999990]
 
 ---
 
-### Homomorphic Addition
+### Basic Homomorphic Operations
 
 ```bash
 python examples/03_homomorphic_addition.py
@@ -565,8 +687,10 @@ python examples/03_homomorphic_addition.py
 Example output:
 
 ```bash
+Ciphertext + Ciphertext
 Input A:    [1, 2, 3]
 Input B:    [4, 5, 6]
+Expected:   [5, 7, 9]
 Decrypted:  [4.999992, 7.000005, 8.999994]
 ```
 
@@ -576,7 +700,7 @@ $$
 Dec(Enc(A) + Enc(B)) \approx A + B
 $$
 
-Current supported operations:
+Current supported basic operations:
 
 $$
 Enc(a) + Enc(b)
@@ -586,7 +710,62 @@ $$
 Enc(a) + Encode(p)
 $$
 
-Ciphertext-plaintext multiplication and ciphertext-ciphertext multiplication are currently planned for Phase 7 due to CKKS scale growth and future rescaling requirements.
+$$
+Enc(a) + k
+$$
+
+$$
+Enc(a) \cdot k
+$$
+
+---
+
+### Multiplication and Relinearization
+
+```bash
+python examples/04_multiplication_relinearization.py
+```
+
+Example output:
+
+```bash
+Ciphertext * Ciphertext
+Input A:              [2]
+Input B:              [3]
+Expected:             [6]
+
+Before Relinearization
+Ciphertext Size:      3
+Scale:                1099511627776
+Decrypted:            [6.00009536707694]
+
+After Relinearization
+Ciphertext Size:      2
+Scale:                1099511627776
+Decrypted:            [6.00009552741176]
+```
+
+This demonstrates:
+
+$$
+Enc(a) \cdot Enc(b) \approx Enc(a \cdot b)
+$$
+
+and shows:
+
+$$
+2 \rightarrow 3 \rightarrow 2
+$$
+
+for ciphertext size.
+
+The scale remains:
+
+$$
+\Delta^2
+$$
+
+because rescaling has not been implemented yet.
 
 ---
 

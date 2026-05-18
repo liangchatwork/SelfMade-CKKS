@@ -120,6 +120,49 @@ class PublicKey:
             f"a={self.a}"
             f")"
         )
+    
+class RelinearizationKey:
+    """
+    Relinearization Key
+
+    After ciphertext multiplication, ciphertext size grows:
+
+        (c0, c1) -> (c0, c1, c2)
+
+    Decryption becomes:
+
+        c0 + c1*s + c2*s²
+
+    Relinearization converts the c2*s² term back into a form
+    that only depends on:
+
+        1 and s
+
+    This educational version uses gadget/base decomposition.
+
+    Instead of encrypting only s² once, we generate keys for:
+
+        B^0 * s²
+        B^1 * s²
+        B^2 * s²
+        ...
+
+    where B is the decomposition base.
+    """
+
+    def __init__(self, entries, base, levels):
+        self.entries = entries
+        self.base = base
+        self.levels = levels
+
+    def __repr__(self):
+        return (
+            f"RelinearizationKey("
+            f"base={self.base}, "
+            f"levels={self.levels}, "
+            f"entries={len(self.entries)}"
+            f")"
+        )
 
 
 class KeyGenerator:
@@ -159,43 +202,15 @@ class KeyGenerator:
         degree,
         modulus,
         noise_std=3.2,
+        decomposition_base=2**10,
+        decomposition_levels=12,
     ):
-        """
-        Initialize key generator.
-
-        Parameters
-        ----------
-        ring : PolynomialRing
-            Polynomial ring used for arithmetic.
-
-        degree : int
-            Ring degree N.
-
-        modulus : int
-            Coefficient modulus q.
-
-        noise_std : float
-            Standard deviation for Gaussian noise.
-
-        ====================================================
-
-        Why sigma ≈ 3.2 ?
-
-        Many HE implementations historically use values
-        around:
-
-            σ ≈ 3.2
-
-        for Gaussian noise generation.
-
-        This value appears frequently in RLWE literature
-        and HE libraries.
-        """
-
         self.ring = ring
         self.degree = degree
         self.modulus = modulus
         self.noise_std = noise_std
+        self.decomposition_base = decomposition_base
+        self.decomposition_levels = decomposition_levels
 
     # ========================================================
     # Secret Key Sampling
@@ -424,4 +439,83 @@ class KeyGenerator:
         return PublicKey(
             b=b,
             a=a,
+        )
+    
+    # ========================================================
+    # Relinearization Key Generation
+    # ========================================================
+
+    def generate_relinearization_key(self, secret_key):
+        """
+        Generate educational relinearization key.
+
+        Goal:
+            Help convert c2*s² into a standard ciphertext form.
+
+        Fresh ciphertext decryption:
+
+            c0 + c1*s
+
+        After multiplication:
+
+            c0 + c1*s + c2*s²
+
+        Relinearization key provides encrypted forms of:
+
+            B^i * s²
+
+        where B is the decomposition base.
+
+        For each level i:
+
+            rlk_i = (b_i, a_i)
+
+        where:
+
+            b_i = -a_i*s + e_i + B^i*s²
+
+        Then:
+
+            b_i + a_i*s ≈ B^i*s²
+
+        This lets us replace c2*s² with ciphertext components
+        involving only 1 and s.
+        """
+
+        s = secret_key.polynomial
+        s_squared = self.ring.multiply(s, s)
+
+        entries = []
+
+        for i in range(self.decomposition_levels):
+            factor = self.decomposition_base ** i
+
+            a_i = self._sample_uniform_polynomial()
+            e_i = self._sample_error_polynomial()
+
+            a_times_s = self.ring.multiply(a_i, s)
+
+            # message = B^i * s²
+            message = factor * s_squared
+
+            # b_i = -a_i*s + e_i + B^i*s²
+            b_i = self.ring.add(
+                self.ring.add(
+                    (-1) * a_times_s,
+                    e_i,
+                ),
+                message,
+            )
+
+            entries.append(
+                PublicKey(
+                    b=b_i,
+                    a=a_i,
+                )
+            )
+
+        return RelinearizationKey(
+            entries=entries,
+            base=self.decomposition_base,
+            levels=self.decomposition_levels,
         )
